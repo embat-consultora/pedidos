@@ -1,0 +1,14 @@
+streamlit
+gspread
+oauth2client
+google-auth
+google-auth-httplib2 
+google-api-python-client
+pandas==2.2.2
+matplotlib
+plotly
+streamlit-cookies-manager
+streamlit-authenticator
+streamlit_extras
+streamlit_javascript
+pandasql

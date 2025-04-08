@@ -12,3 +12,4 @@ streamlit-authenticator
 streamlit_extras
 streamlit_javascript
 pandasql
+st-gsheets-connection

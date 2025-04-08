@@ -38,6 +38,7 @@ if "df_pedidos" not in st.session_state:
 else:
     df = st.session_state["df_pedidos"]
 
+df = get_google_sheet(connectionGeneral, pedidosSheet)
 # Limpieza y formato
 df = df.dropna(how='all')
 df["Fecha"] = pd.to_datetime(df["Fecha"], format="%d/%m/%Y", errors="coerce")

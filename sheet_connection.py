@@ -13,9 +13,8 @@ def get_google_sheet(connection, sheet_id):
         conn = st.connection(connection, type=GSheetsConnection)
         df = conn.read(spreadsheet=url,ttl=0)
         if df is not None and not df.empty:
-             return df 
+             return df
         else:
-            st.error("No data found.")
             return None
 
     except FileNotFoundError as e:

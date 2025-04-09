@@ -23,23 +23,31 @@ with open("style.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # Título y botón de refrescar
-st.title("📋 Pedidos - Historico")
+st.title("📋 Pedidos - Histórico")
 
 if st.button("🔄 Refrescar Pedidos"):
-    df_completo = get_google_sheet(connectionGeneral, pedidosSheet)
-    st.session_state["df_pedidos"] = df_completo.copy()
-    st.success("✅ Pedidos actualizados desde Google Sheets")
+    df_actualizado = get_google_sheet(connectionGeneral, pedidosSheet)
+    if df_actualizado is not None and not df_actualizado.empty:
+        st.session_state["df_pedidos"] = df_actualizado.copy()
+        st.success("✅ Pedidos actualizados desde Google Sheets")
 
 # Si no hay datos guardados, cargarlos por primera vez
 if "df_pedidos" not in st.session_state:
-    df_completo = get_google_sheet(connectionGeneral, pedidosSheet)
-    st.session_state["df_pedidos"] = df_completo.copy() 
+    df_inicial = get_google_sheet(connectionGeneral, pedidosSheet)
+    if df_inicial is not None and not df_inicial.empty:
+        st.session_state["df_pedidos"] = df_inicial.copy()
+    else:
+        st.info("No hay pedidos para mostrar.")
+        st.session_state["df_pedidos"] = pd.DataFrame()
+
+# Usar el DataFrame desde sesión
+df = st.session_state["df_pedidos"]
+
+# Validamos que haya datos antes de procesar
+if not df.empty:
+    df = df.dropna(how='all')
+    df["Fecha"] = pd.to_datetime(df["Fecha"], format="%d/%m/%Y", errors="coerce")
+    df["Fecha"] = df["Fecha"].dt.strftime("%d/%m/%Y")
+    st.dataframe(df)
 else:
-    df = st.session_state["df_pedidos"]
-
-# Limpieza y formato
-df = df.dropna(how='all')
-df["Fecha"] = pd.to_datetime(df["Fecha"], format="%d/%m/%Y", errors="coerce")
-df["Fecha"] = df["Fecha"].dt.strftime("%d/%m/%Y")
-
-st.dataframe(df)
+    st.info("No hay pedidos para mostrar.")

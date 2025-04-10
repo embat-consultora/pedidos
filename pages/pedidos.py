@@ -1,10 +1,10 @@
 from navigation import make_sidebar
 import streamlit as st
 from page_utils import apply_page_config
-from sheet_connection import get_google_sheet, update_google_sheet
+from sheet_connection import get_google_sheet, update_google_sheet,create_gsheets_connection
 import pandas as pd
 from datetime import datetime
-from variables import connectionGeneral, pedidosSheet, pedidosNombre
+from variables import connectionGeneral, pedidosSheet, pedidosNombre, detalleNombre
 
 # Configuración inicial
 st.session_state["current_page"] = "pedidos"
@@ -19,57 +19,77 @@ else:
     if st.session_state.role == 'admin':
         make_sidebar()
 
+conn = create_gsheets_connection(connectionGeneral)
 # Estilos CSS
 with open("style.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# Título y botón de refrescar
 st.title("📋 Pedidos - Clínica Veterinaria")
 
-if st.button("🔄 Refrescar Pedidos"):
-    df_actualizado = get_google_sheet(connectionGeneral, pedidosSheet)
-    if df_actualizado is not None and not df_actualizado.empty:
-        st.session_state["df_pedidos"] = df_actualizado.copy()
-        st.success("✅ Pedidos actualizados desde Google Sheets")
- 
-# Carga inicial si no hay datos en sesión
+filtros ,refresh= st.columns([3, 1])
 if "df_pedidos" not in st.session_state:
-    df_cargado = get_google_sheet(connectionGeneral, pedidosSheet)
-    if df_cargado is not None and not df_cargado.empty:
-        st.session_state["df_pedidos"] = df_cargado.copy()
-    else:
-        st.session_state["df_pedidos"] = pd.DataFrame()
+    df_pedidos = get_google_sheet(connectionGeneral, pedidosSheet)
+    st.session_state["df_pedidos"] = df_pedidos.copy() if df_pedidos is not None else pd.DataFrame()
+if "df_detalle" not in st.session_state:
+    df_detalle = conn.read(worksheet=detalleNombre)
+    st.session_state["df_detalle"] = df_detalle.copy() if df_detalle is not None else pd.DataFrame()
+with refresh:
+    if st.button("🔄 Refrescar Pedidos"):
+        df_pedidos = get_google_sheet(connectionGeneral, pedidosSheet)
+        df_detalle = conn.read(worksheet=detalleNombre)
 
-# Usar el dataframe de sesión
+        if df_pedidos is not None and not df_pedidos.empty:
+            st.session_state["df_pedidos"] = df_pedidos.copy()
+        if df_detalle is not None and not df_detalle.empty:
+            st.session_state["df_detalle"] = df_detalle.copy()
+        st.success("✅ Actualizacion correcta")
+        st.rerun()
+
 df = st.session_state["df_pedidos"]
-
-# Verificamos que tenga datos antes de procesar
+detalle = st.session_state["df_detalle"]
 if not df.empty:
-    # Limpieza y formato
     df = df.dropna(how='all')
     df["Fecha"] = pd.to_datetime(df["Fecha"], format="%d/%m/%Y", errors="coerce")
     df["Fecha"] = df["Fecha"].dt.strftime("%d/%m/%Y")
 
-    # Filtros
-    filtro = st.radio(
-        "📌 Filtrar pedidos por:",
-        ("Todos", "Solo urgentes", "Solo de hoy", "Urgentes de hoy"),
-        horizontal=True
-    )
+    # Agrupar detalle por pedido
+    if not detalle.empty:
+        detalle_grouped = detalle.groupby("Nro Pedido").apply(
+            lambda x: ", ".join(f"{row['Producto']} x{row['Cantidad']}" for _, row in x.iterrows())
+        ).reset_index(name="Detalle Pedido")
 
+        # Unir con pedidos
+        df = df.merge(detalle_grouped, on="Nro Pedido", how="left")
+    else:
+        df["Detalle Pedido"] = "Sin detalles"
+
+    # Filtros
+    with filtros: 
+        filtro = st.radio(
+            "📌 Filtrar pedidos por:",
+            ("Todos", "Solo urgentes", "Solo de hoy", "Urgentes de hoy","Listos de hoy"),
+            horizontal=True
+        )
+
+    hoy_str = datetime.now().strftime("%d/%m/%Y")
+
+    # Aplicar filtros según selección
     if filtro == "Solo urgentes":
         df = df[df["Urgente"] == 1]
+        df = df[df["Estado"] == "Abierto"]
     elif filtro == "Solo de hoy":
-        hoy_str = datetime.now().strftime("%d/%m/%Y")
         df = df[df["Fecha"] == hoy_str]
+        df = df[df["Estado"] == "Abierto"]
     elif filtro == "Urgentes de hoy":
-        hoy_str = datetime.now().strftime("%d/%m/%Y")
         df = df[(df["Urgente"] == 1) & (df["Fecha"] == hoy_str)]
+        df = df[df["Estado"] == "Abierto"]
+    elif filtro == "Listos de hoy":
+        df = df[(df["Estado"] == "Listo") & (df["Fecha"] == hoy_str)]
+    else:
+        df = df[df["Estado"] == "Abierto"]
+    
 
-    # Mostrar solo pedidos abiertos
-    df = df[df["Estado"] == "Abierto"]
 
-    # Mostrar resultados
     if df.empty:
         st.warning("⚠️ No hay pedidos que coincidan con los filtros seleccionados.")
     else:
@@ -77,16 +97,14 @@ if not df.empty:
         for index, row in df.iterrows():
             with st.expander(f"Pedido #{row['Nro Pedido']} - {row['Cliente']}"):
                 st.write(f"📅 Fecha: {row['Fecha']}")
-                st.write(f"📝 Producto: {row['Pedido']}")
-                st.write(f"📦 Cantidad: {row['Cantidad']}")
+                st.write(f"📝 Productos: {row['Detalle Pedido']}")
                 st.write(f"📍 Dirección: {row['Direccion']}")
-                st.write(f"📞 Teléfono: {row['Telefono']}")
+                st.write(f"📞 Teléfono: {str(int(float(row['Telefono'])))}")
                 st.write(f"🚨 Urgente: {'Sí' if row['Urgente'] == 1 else 'No'}")
                 st.write(f"📌 Estado: {row['Estado']}")
 
                 if row['Estado'] == "Abierto":
                     if st.button(f"✅ Marcar como Listo (Pedido #{row['Nro Pedido']})", key=f"boton_{index}"):
-                        # Recuperar el DataFrame completo
                         full_df = st.session_state["df_pedidos"]
                         pedido_idx = full_df.index[full_df["Nro Pedido"] == row["Nro Pedido"]].tolist()
                         if pedido_idx:

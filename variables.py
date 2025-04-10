@@ -5,6 +5,9 @@ import location.es as vars
 pedidosSheet="18JWlO4eq1CXAffEgz6_3KbodPvGhYK-u4Q01fz9BV5U"
 pedidosNombre="pedidos"
 connectionGeneral="gsheets"
+connectionDetalle="detalle"
+productoNombre="productos"
+detalleNombre="detallePedido"
 #branding colors 
 aquamarine="#3AA597"
 amarillo="#FECA1D"

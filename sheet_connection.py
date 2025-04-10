@@ -4,6 +4,14 @@ from streamlit_gsheets import GSheetsConnection
 import gspread
 logging.basicConfig(level=logging.DEBUG)
 
+def create_gsheets_connection(connectionGeneral):
+    try:
+        conn = st.connection(connectionGeneral, type=GSheetsConnection)
+        return conn
+    except Exception as e:
+        st.error(f"No se pudo conectar con el almacenamiento: {e}")
+        logging.error(e, stack_info=True, exc_info=True)
+        return None
 def get_google_sheet(connection, sheet_id):
     """
     Connects to a Google Sheet using service account credentials and returns the sheet.

@@ -54,10 +54,10 @@ if not df.empty:
     df["Fecha"] = pd.to_datetime(df["Fecha"], format="%d/%m/%Y", errors="coerce")
     df["Fecha"] = df["Fecha"].dt.strftime("%d/%m/%Y")
     if not detalle.empty:
-        detalle_grouped = detalle.groupby("Nro Pedido").apply(
-            lambda x: ", ".join(f"{row['Producto']} x{row['Cantidad']}" for _, row in x.iterrows())
-        ).reset_index(name="Detalle Pedido")
-
+        detalle_grouped = (
+            detalle.groupby("Nro Pedido")[["Producto", "Cantidad"]]
+            .apply(lambda x: ", ".join(f"{row['Producto']} x{row['Cantidad']}" for _, row in x.iterrows()))
+            .reset_index(name="Detalle Pedido"))
         # Unir con pedidos
         df = df.merge(detalle_grouped, on="Nro Pedido", how="left")
     else:

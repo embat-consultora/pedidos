@@ -43,6 +43,6 @@ if st.button(loginButton, type="primary"):
 # Redireccionamos después del rerun
 if st.session_state.get("logged_in") and "redirect_to" in st.session_state:
     role = st.session_state.redirect_to
-    del st.session_state.redirect_to  # Eliminamos para evitar redirección futura
+    del st.session_state.redirect_to
     if role == 'admin':
         st.switch_page("pages/pedidos.py")

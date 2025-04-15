@@ -1,6 +1,7 @@
 import streamlit as st
 from time import sleep
 from variables import logoutButton
+from page_utils import flag_activo
 def get_current_page_name():
     return st.session_state.get("current_page", "")
 
@@ -23,8 +24,10 @@ def make_sidebar():
 
         if st.session_state.get("logged_in", False):
             st.page_link("pages/pedidos.py", label="Pedidos")
-            st.page_link("pages/productos.py", label="Productos")
-            st.page_link("pages/pedidosHistorico.py", label="Historico")
+            if flag_activo("stock"):
+                st.page_link("pages/productos.py", label="Productos")
+            if flag_activo("historico"):
+                st.page_link("pages/pedidosHistorico.py", label="Historico")
             st.write("")
             st.write("")
 

@@ -19,3 +19,4 @@ google-auth-httplib2
 google-api-python-client
 Authlib>=1.3.2
 fpdf
+python-dotenv

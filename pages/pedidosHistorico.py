@@ -1,67 +1,92 @@
-from navigation import make_sidebar
 import streamlit as st
+from navigation import make_sidebar
 from page_utils import apply_page_config
-from sheet_connection import get_google_sheet,create_gsheets_connection
 import pandas as pd
 from datetime import datetime
-from variables import connectionGeneral, pedidosSheet, detalleNombre
+from modules.data_base import get, updateEstadoPedido
+from variables import pedidoTable, detallePedidoTable, productoTable
 
 # Configuración inicial
+st.session_state["current_page"] = "pedidos"
 apply_page_config()
 
-conn = create_gsheets_connection(connectionGeneral)
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("Sesión expirada. Redirigiendo a login...")
     st.session_state.logged_in = False 
     st.session_state.redirected = True 
     st.switch_page("streamlit_app.py")
 else:
-    if st.session_state.role == 'admin':
-        make_sidebar()
+    make_sidebar()
 
 # Estilos CSS
 with open("style.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# Título y botón de refrescar
-st.title("📋 Pedidos - Histórico")
+st.title("📋 Histórico Pedidos")
 
-if st.button("🔄 Refrescar Pedidos"):
-    df_pedidos = get_google_sheet(connectionGeneral, pedidosSheet)
-    df_detalle = conn.read(worksheet=detalleNombre)
+filtros, refresh = st.columns([3, 1])
 
-    if df_pedidos is not None and not df_pedidos.empty:
-        st.session_state["df_pedidos"] = df_pedidos.copy()
-    if df_detalle is not None and not df_detalle.empty:
-        st.session_state["df_detalle"] = df_detalle.copy()
-    st.success("✅ Actualizacion correcta")
-    st.rerun()
-    
-
-# Si no hay datos guardados, cargarlos por primera vez
+# 🔄 Cargar pedidos y detalles
 if "df_pedidos" not in st.session_state:
-    df_pedidos = get_google_sheet(connectionGeneral, pedidosSheet)
-    st.session_state["df_pedidos"] = df_pedidos.copy() if df_pedidos is not None else pd.DataFrame()
+    df_pedidos = get(pedidoTable)
+    st.session_state["df_pedidos"] = pd.DataFrame(df_pedidos) if df_pedidos else pd.DataFrame()
+
 if "df_detalle" not in st.session_state:
-    df_detalle = conn.read(worksheet=detalleNombre)
-    st.session_state["df_detalle"] = df_detalle.copy() if df_detalle is not None else pd.DataFrame()
+    df_detalle = get(detallePedidoTable)
+    st.session_state["df_detalle"] = pd.DataFrame(df_detalle) if df_detalle else pd.DataFrame()
+
+with refresh:
+    if st.button("🔄 Refrescar Pedidos"):
+        df_pedidos = get(pedidoTable)
+        df_detalle = get(detallePedidoTable)
+        st.session_state["df_pedidos"] = pd.DataFrame(get(pedidoTable)) if df_pedidos else pd.DataFrame()
+        st.session_state["df_detalle"] = pd.DataFrame(get(detallePedidoTable)) if df_detalle else pd.DataFrame()
+        st.success("✅ Actualización correcta")
+        st.rerun()
 
 df = st.session_state["df_pedidos"]
 detalle = st.session_state["df_detalle"]
-# Validamos que haya datos antes de procesar
+
 if not df.empty:
     df = df.dropna(how='all')
-    df["Fecha"] = pd.to_datetime(df["Fecha"], format="%d/%m/%Y", errors="coerce")
-    df["Fecha"] = df["Fecha"].dt.strftime("%d/%m/%Y")
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['Fecha'] = df['created_at'].dt.strftime('%d/%m/%Y')
+
+    # Si detalle no está vacío
     if not detalle.empty:
+        productos_data = get(productoTable)
+        productos = pd.DataFrame(productos_data)
+
+        # Merge para traer nombre del producto
+        detalle = detalle.merge(productos[['id', 'nombre']], left_on='nroProducto', right_on='id', how='left')
+
+        # Agrupar detalles por pedido
         detalle_grouped = (
-            detalle.groupby("Nro Pedido")[["Producto", "Cantidad"]]
-            .apply(lambda x: ", ".join(f"{row['Producto']} x{row['Cantidad']}" for _, row in x.iterrows()))
-            .reset_index(name="Detalle Pedido"))
-        # Unir con pedidos
-        df = df.merge(detalle_grouped, on="Nro Pedido", how="left")
-    else:
-        df["Detalle Pedido"] = "Sin detalles"
-    st.dataframe(df, hide_index=True)
-else:
-    st.info("No hay pedidos para mostrar.")
+            detalle.groupby("nroPedido")[["nombre", "cantidad"]]
+            .apply(lambda x: ", ".join(f"{row['nombre']} x{row['cantidad']}" for _, row in x.iterrows()))
+            .reset_index(name="Detalle Pedido")
+        )
+
+        # Merge con pedidos
+        df = df.merge(detalle_grouped, left_on="id", right_on="nroPedido", how="left")
+
+        # 🔵 Ahora preparamos el DataFrame para mostrar
+        # Seleccionamos las columnas que queremos ver en la tabla
+        columnas_a_mostrar = [
+            "Fecha",      # Fecha creada
+            "cliente",    # Nombre del cliente
+            "direccion",  # Dirección
+            "telefono",   # Teléfono
+            "estado",     # Estado del pedido
+            "Detalle Pedido",  # Texto con productos
+            "total",
+        ]
+
+        # Aseguramos que estén todas las columnas (evitar errores si falta alguna)
+        columnas_presentes = [col for col in columnas_a_mostrar if col in df.columns]
+
+        tabla_mostrar = df[columnas_presentes]
+
+        # Ahora sí mostramos la tabla
+        st.subheader("📝 Tabla de pedidos")
+        st.dataframe(tabla_mostrar, use_container_width=True, hide_index=True)

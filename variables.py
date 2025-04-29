@@ -3,11 +3,10 @@ import streamlit as st
 import location.es as vars
 #main Db
 pedidosSheet="18JWlO4eq1CXAffEgz6_3KbodPvGhYK-u4Q01fz9BV5U"
-pedidosNombre="pedidos"
-connectionGeneral="gsheets"
-connectionDetalle="detalle"
-productoNombre="productos"
-detalleNombre="detallePedido"
+pedidoTable="pedidos"
+detallePedidoTable="detallePedido"
+productoTable="producto"
+title = "En Camino"
 #branding colors 
 aquamarine="#3AA597"
 amarillo="#FECA1D"
@@ -34,4 +33,3 @@ noDatosDisponibles="No hay datos disponibles"
 
 page_icon="./images/favico.ico"
 companyIcon="./images/formIcon.png"
-title= vars.title

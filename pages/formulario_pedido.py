@@ -1,24 +1,14 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
-from variables import pedidosNombre, detalleNombre, productoNombre, connectionGeneral, page_icon
-from datetime import datetime
 import pandas as pd
+from datetime import datetime
 import logging
+from modules.data_base import get, add
+from variables import pedidoTable, detallePedidoTable, productoTable, page_icon  # <-- tablas en Supabase
 
 st.set_page_config(
     page_title="Formulario Pedido",
     page_icon=page_icon,
 )
-
-# Conexión a Google Sheets
-def create_gsheets_connection():
-    try:
-        conn = st.connection(connectionGeneral, type=GSheetsConnection)
-        return conn
-    except Exception as e:
-        st.error(f"No se pudo conectar con el almacenamiento: {e}")
-        logging.error(e, stack_info=True, exc_info=True)
-        return None
 
 # Variables de sesión
 if "pedido_guardado" not in st.session_state:
@@ -29,16 +19,17 @@ if "productos_cliente" not in st.session_state:
 
 st.title("📋 Nuevo pedido")
 
-# Conectarse y obtener lista de productos
-conn = create_gsheets_connection()
+# Obtener lista de productos desde Supabase
 productos_disponibles = []
+precios_dict = {}
+productos_data = get(productoTable)
 
-if conn:
-    productos_data = conn.read(worksheet=productoNombre)
-    if not productos_data.empty and "Producto" in productos_data.columns:
-        productos_data = productos_data.dropna(subset=["Producto"])
-        productos_disponibles = productos_data["Producto"].tolist()
-        precios_dict = dict(zip(productos_data["Producto"], productos_data["Precio"]))
+if productos_data:
+    productos_df = pd.DataFrame(productos_data)
+    if not productos_df.empty and "nombre" in productos_df.columns:
+        productos_df = productos_df.dropna(subset=["nombre"])
+        productos_disponibles = productos_df["nombre"].tolist()
+        precios_dict = dict(zip(productos_df["nombre"], productos_df["precio"]))
 
 if not productos_disponibles:
     st.warning("⚠️ No hay productos cargados aún.")
@@ -55,7 +46,8 @@ else:
         cantidad = col2.number_input("Cantidad", min_value=1, step=1, key="cantidad_actual")
         with col3:
             precio_unitario = precios_dict.get(producto_seleccionado, 0)
-            st.text(f"Precio:${precio_unitario:.2f} ")
+            st.text(f"Precio: ${precio_unitario:.2f}")
+
         subtotal = precio_unitario * cantidad
         st.write(f"Subtotal: ${subtotal:.2f}")
 
@@ -96,51 +88,42 @@ else:
             elif not st.session_state.productos_cliente:
                 st.error("⚠️ Debés agregar al menos un producto.")
             else:
-                fecha = datetime.now().strftime("%d/%m/%Y")
                 urgente_bool = 1 if urgente == "Sí" else 0
 
-                # Leer datos actuales
-                pedidos_df = conn.read(worksheet=pedidosNombre)
-                detalle_df = conn.read(worksheet=detalleNombre)
-
-                nro_pedido = len(pedidos_df) + 1 if not pedidos_df.empty else 1
-
-                # Crear fila para hoja pedidos
-                pedido_general = pd.DataFrame([{
-                    "Nro Pedido": nro_pedido,
-                    "Fecha": fecha,
-                    "Cliente": nombre.strip(),
-                    "Direccion": direccion.strip(),
-                    "Telefono": telefono.strip(),
-                    "Urgente": urgente_bool,
-                    "Estado": "Abierto",
-                    "Total": total_general
-                }])
-
-                pedido_general = pedido_general[pedidos_df.columns] if not pedidos_df.empty else pedido_general
-                pedidos_actualizados = pd.concat([pedidos_df, pedido_general], ignore_index=True)
-
-                # Crear filas para hoja detalle
-                detalle_nuevo = pd.DataFrame([
-                    {
-                        "Nro Pedido": nro_pedido,
-                        "Producto": p["producto"],
-                        "Cantidad": p["cantidad"]
+                try:
+                    # Crear el pedido
+                    pedido_data = {
+                        "cliente": nombre.strip(),
+                        "direccion": direccion.strip(),
+                        "telefono": telefono.strip(),
+                        "urgencia": urgente_bool,
+                        "estado": "Abierto",
+                        "total": total_general
                     }
-                    for p in st.session_state.productos_cliente
-                ])
+                    pedido_response = add(pedidoTable, pedido_data)
+                    # Obtener el ID o el NroPedido generado (depende de cómo esté configurado tu Supabase)
+                    nro_pedido = pedido_response.data[0]["id"]  # o "Nro Pedido" si lo guardás así
+                 
+                    # Agregar los productos al detallePedido
+                    for p in st.session_state.productos_cliente:
+                        producto_info = productos_df[productos_df["nombre"] == p["producto"]].iloc[0]
+                        st.write(producto_info["id"])
+                        detalle_data = {
+                            "nroProducto": int(producto_info["id"]), 
+                            "nroPedido": int(nro_pedido),           
+                            "cantidad": int(p["cantidad"]),      
+                            "precio": float(p["subtotal"])    
+                        }
+                        add(detallePedidoTable, detalle_data)
 
-                detalle_nuevo = detalle_nuevo[detalle_df.columns] if not detalle_df.empty else detalle_nuevo
-                detalle_actualizado = pd.concat([detalle_df, detalle_nuevo], ignore_index=True)
+                    st.success("✅ El pedido fue enviado correctamente.")
+                    st.session_state.pedido_guardado = True
+                    st.session_state.productos_cliente = []
+                    st.rerun()
 
-                # Guardar ambos
-                conn.update(worksheet=pedidosNombre, data=pedidos_actualizados)
-                conn.update(worksheet=detalleNombre, data=detalle_actualizado)
-
-                st.success("✅ El pedido fue enviado correctamente.")
-                st.session_state.pedido_guardado = True
-                st.session_state.productos_cliente = []
-                st.rerun()
+                except Exception as e:
+                    logging.error(e, stack_info=True, exc_info=True)
+                    st.error(f"❌ Error al enviar el pedido: {e}")
 
     else:
         st.success("✅ El pedido fue enviado correctamente.")

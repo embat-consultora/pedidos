@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import logging
-from modules.data_base import get, add
+from modules.data_base import getProductWithStock, add, updateProductStock
 from variables import pedidoTable, detallePedidoTable, productoTable, page_icon  # <-- tablas en Supabase
 
 st.set_page_config(
@@ -22,7 +22,7 @@ st.title("📋 Nuevo pedido")
 # Obtener lista de productos desde Supabase
 productos_disponibles = []
 precios_dict = {}
-productos_data = get(productoTable)
+productos_data = getProductWithStock(productoTable)
 
 if productos_data:
     productos_df = pd.DataFrame(productos_data)
@@ -43,7 +43,18 @@ else:
 
         col1, col2, col3 = st.columns([3, 1, 1])
         producto_seleccionado = col1.selectbox("Producto", productos_disponibles, key="producto_actual")
-        cantidad = col2.number_input("Cantidad", min_value=1, step=1, key="cantidad_actual")
+        stock_disponible = int(productos_df.loc[
+            productos_df["nombre"] == producto_seleccionado, "stock"
+        ].values[0])
+
+        cantidad = col2.number_input(
+            "Cantidad",
+            min_value=1,
+            max_value=stock_disponible,
+            step=1,
+            key="cantidad_actual"
+        )
+
         with col3:
             precio_unitario = precios_dict.get(producto_seleccionado, 0)
             st.text(f"Precio: ${precio_unitario:.2f}")
@@ -107,7 +118,10 @@ else:
                     # Agregar los productos al detallePedido
                     for p in st.session_state.productos_cliente:
                         producto_info = productos_df[productos_df["nombre"] == p["producto"]].iloc[0]
-                        st.write(producto_info["id"])
+                        stock_actual = int(producto_info["stock"])
+                        cantidad_pedida = int(p["cantidad"])
+                        producto_id = int(producto_info["id"])
+
                         detalle_data = {
                             "nroProducto": int(producto_info["id"]), 
                             "nroPedido": int(nro_pedido),           
@@ -115,6 +129,8 @@ else:
                             "precio": float(p["subtotal"])    
                         }
                         add(detallePedidoTable, detalle_data)
+                        nuevo_stock = max(stock_actual - cantidad_pedida, 0)
+                        updateProductStock(productoTable, producto_id, nuevo_stock)
 
                     st.success("✅ El pedido fue enviado correctamente.")
                     st.session_state.pedido_guardado = True

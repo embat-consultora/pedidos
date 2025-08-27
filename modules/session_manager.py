@@ -34,7 +34,7 @@ def is_authenticated():
 def validate_get_user():
     if hasattr(st, "experimental_user") and st.experimental_user and st.experimental_user.is_logged_in:
         if "role" not in st.session_state:
-            email = st.experimental_user.email
+            email = st.email
             if load_user(email):
                 print('user loaded correctly')
                 return True

@@ -14,12 +14,23 @@ def get(tableName):
     response = supabase.table(tableName).select('*').execute()
     return response.data
 
+def getProductWithStock(tableName):
+    response = (
+        supabase.table(tableName)
+        .select("*")
+        .gt("stock", 0) 
+        .execute()
+    )
+    return response.data
+
 def getEqual(tableName, variable, value):
     response = supabase.table(tableName).select('*').eq(variable, value).execute()
     return response.data
 def add(tableName, data):
     response = supabase.table(tableName).insert(data).execute()
     return response
+def updateProductStock(tableName, product_id, new_stock):
+    return supabase.table(tableName).update({"stock": new_stock}).eq("id", product_id).execute()
 
 def updateEstadoPedido(pedidoId, nuevo_estado):
     return supabase.table('pedidos').update({"estado": nuevo_estado}).eq("id", pedidoId).execute()

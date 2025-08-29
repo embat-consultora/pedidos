@@ -65,7 +65,6 @@ if not prods.empty:
 
         # Generamos la URL con query params
         qr_url = f"{base_url}/qr?codigo={codigo}&pack={pack}"
-
         # Generamos QR con esa URL
         qr = qrcode.make(qr_url)
         # Generar QR

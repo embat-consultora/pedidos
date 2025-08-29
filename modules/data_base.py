@@ -32,10 +32,8 @@ def add(tableName, data):
 def updateProductStock(tableName, product_id, new_stock):
     return supabase.table(tableName).update({"stock": new_stock}).eq("id", product_id).execute()
 
-def updateProductQR(tableName, product_id, functionMath):
-    supabase.table(tableName).update({
-    "stock": supabase.func(functionMath)
-    }).eq("id", product_id).execute()
+def getProductStockById(tableName, product_id):
+    return supabase.table(tableName).select('nombre,stock').eq("id", product_id).execute()
 
 def updateEstadoPedido(pedidoId, nuevo_estado):
     return supabase.table('pedidos').update({"estado": nuevo_estado}).eq("id", pedidoId).execute()

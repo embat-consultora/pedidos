@@ -1,6 +1,5 @@
 import streamlit as st
 from navigation import make_sidebar
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from page_utils import apply_page_config
 from modules.data_base import get, add
@@ -40,6 +39,7 @@ if not prods.empty:
     columnas_visibles = {
         "nombre": "Producto",
         "stock": "Stock",
+        "cantidad_pack": "Cantidad Pack",
         "precio": "Precio"
     }
     prods = prods[list(columnas_visibles.keys())]  # Filtramos las columnas deseadas
@@ -53,14 +53,16 @@ with st.expander("Agregar nuevo producto", expanded=False):
     with st.form("form_nuevo_producto"):
         nombre = st.text_input("Nombre del producto").strip()
         stock_inicial = st.number_input("Stock inicial", min_value=0, step=1)
+        cantidad_pack = st.number_input("Cantidad Pack", min_value=0)
         precio = st.text_input("Precio")
         agregar_producto = st.form_submit_button("Agregar producto")
 
     if agregar_producto:
-        if nombre and stock_inicial and precio:
+        if nombre and stock_inicial and precio and cantidad_pack:
             data = {
                 "nombre": nombre,
                 "stock": stock_inicial,
+                "cantidad_pack": cantidad_pack,
                 "precio": precio
             }
             try:

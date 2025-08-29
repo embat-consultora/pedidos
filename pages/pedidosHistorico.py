@@ -2,8 +2,7 @@ import streamlit as st
 from navigation import make_sidebar
 from page_utils import apply_page_config
 import pandas as pd
-from datetime import datetime
-from modules.data_base import get, updateEstadoPedido
+from modules.data_base import get
 from variables import pedidoTable, detallePedidoTable, productoTable
 
 # Configuración inicial

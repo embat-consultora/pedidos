@@ -1,8 +1,5 @@
-from variables import celeste, amarillo, aquamarine, azul, orange, teal, gris,rojo,verde
+
 import re 
-import pandas as pd
-import altair as alt
-from streamlit_carousel import carousel
 def filter_dataframe(df, filters):
     for column, value in filters.items():
         df = df[df[column].isin(value)]

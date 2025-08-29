@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 import logging
 from modules.data_base import getProductWithStock, add, updateProductStock
 from variables import pedidoTable, detallePedidoTable, productoTable, page_icon  # <-- tablas en Supabase

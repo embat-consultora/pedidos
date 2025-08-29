@@ -26,6 +26,7 @@ def make_sidebar():
             st.page_link("pages/pedidos.py", label="Pedidos")
             if flag_activo("stock"):
                 st.page_link("pages/productos.py", label="Productos")
+                st.page_link("pages/productos_qr.py", label="Productos QR")
             if flag_activo("historico"):
                 st.page_link("pages/pedidosHistorico.py", label="Historico")
             st.write("")
